@@ -1,4 +1,4 @@
-import sys, os, subprocess, json, uuid, requests
+import sys, os, subprocess, json, uuid, requests, re
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -58,6 +58,7 @@ def ensure_template_available():
             print("✅ Registro de plantilla agregado a db.json")
 
 ensure_template_available()
+
 
 
 # -------------------------------------------------
@@ -244,8 +245,6 @@ def debug_list_placeholders(doc_path):
     Escanea un archivo .docx y lista todos los placeholders {{...}} detectados,
     incluso si están divididos en runs.
     """
-    from docx import Document
-    import re
 
     print(f"\n🔍 Analizando marcadores en: {doc_path}")
     doc = Document(doc_path)
@@ -275,6 +274,9 @@ def debug_list_placeholders(doc_path):
 
     print(f"🧾 Total: {len(encontrados)} marcadores encontrados.\n")
 
+    ensure_template_available()
+    debug_list_placeholders(os.path.join(TEMPLATES_DIR, TEMPLATE_NAME))
+    
     # --- Generar documento Word ---
 def generar_documento_word_local(plantilla_id: str, valores: dict, request: Request):
 
