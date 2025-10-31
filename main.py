@@ -175,6 +175,7 @@ def cotizar(data: CotizacionRequest, request: Request):
 
     for activo in data.activos:
         valores_para_doc["descripcion"] = activo.nombre_activo
+        print("🧩 Valores para plantilla:", valores_para_doc)
         valores_para_doc["precio"] = formato_miles(activo.valor)
 
         for e in escenarios:
@@ -229,6 +230,7 @@ def cotizar(data: CotizacionRequest, request: Request):
         valores=valores_para_doc,
         request=request
     )
+    print("🧩 Valores para plantilla:", valores_para_doc) #linea agregada
 
     return {
         "mensaje": "Cotización generada correctamente",
