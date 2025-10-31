@@ -167,14 +167,14 @@ def cotizar(data: CotizacionRequest, request: Request):
 
     valores_para_doc = {
         "nombre": data.nombre,
-        "descripcion": "",
+        "A": "",
         "precio": "",
         "fecha": datetime.now().strftime("%d/%m/%Y"),
         "folio": datetime.now().strftime("%Y%m%d%H%M%S"),
     }
 
     for activo in data.activos:
-        valores_para_doc["descripcion"] = activo.nombre_activo
+        valores_para_doc["A"] = activo.nombre_activo
         print("🧩 Valores para plantilla:", valores_para_doc)
         valores_para_doc["precio"] = formato_miles(activo.valor)
 
