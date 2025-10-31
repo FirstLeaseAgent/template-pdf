@@ -274,9 +274,9 @@ def debug_list_placeholders(doc_path):
 
     print(f"🧾 Total: {len(encontrados)} marcadores encontrados.\n")
 
-    ensure_template_available()
-    debug_list_placeholders(os.path.join(TEMPLATES_DIR, TEMPLATE_NAME))
-    
+ensure_template_available()
+debug_list_placeholders(os.path.join(TEMPLATES_DIR, TEMPLATE_NAME))
+
     # --- Generar documento Word ---
 def generar_documento_word_local(plantilla_id: str, valores: dict, request: Request):
 
