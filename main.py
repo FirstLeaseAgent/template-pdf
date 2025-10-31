@@ -19,7 +19,7 @@ TEMPLATES_DIR = "templates"
 OUTPUT_DIR = "outputs"
 DB_PATH = "db.json"
 TEMPLATE_NAME = "Plantilla_Cotizacion.docx"
-GITHUB_RAW_URL = "https://github.com/FirstLeaseAgent/api-cotizaciones/raw/refs/heads/main/api-cotizaciones/templates/Plantilla_Cotizacion.docx"
+GITHUB_RAW_URL = "https://github.com/FirstLeaseAgent/template-pdf/raw/refs/heads/main/templates/Plantilla_Cotizacion.docx"
 
 os.makedirs(TEMPLATES_DIR, exist_ok=True)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -186,11 +186,55 @@ def cotizar(data: CotizacionRequest, request: Request):
                 comision=activo.comision,
                 rentas_deposito=activo.rentas_deposito,
             )
-            resultado["Cotizaciones"].append(calculos)
 
+            # 🧩 Mapeo de alias para nombres esperados en la plantilla
+            alias = {
+                "rentaendeposito": "deposito",
+                "rentamensual": "mensualidad",
+                "ivarentamensual": "IVAmes",
+                "subtotalpagoinicial": "subinicial",
+                "ivapagoinicial": "IVAinicial",
+                "ivaresidual": "IVAresidual",
+                "reembolsodeposito": "reembolso",
+                "totalrentamensual": "totalmes"
+            }
+
+            # 🧮 Generar variables para la plantilla (24/36/48)
             plazo = str(e["plazo"])
             for k, v in calculos.items():
-                valores_para_doc[f"{k.lower()}{plazo}"] = formato_miles(v)
+                clave = k.replace("_", "").lower()
+                nombre_final = alias.get(clave, clave)
+                valores_para_doc[f"{nombre_final}{plazo}"] = formato_miles(v)
+
+            # 📊 Guardar también los cálculos para el JSON de salida
+            resultado["Cotizaciones"].append(calculos)
+
+    # ==============================
+    # Generar documento Word + PDF
+    # ==============================
+
+    # Buscar plantilla registrada
+    with open(DB_PATH, "r") as db_file:
+        db_data = json.load(db_file)
+
+    plantilla = db_data["plantillas"][0] if db_data["plantillas"] else None
+
+    if not plantilla:
+        raise HTTPException(status_code=404, detail="No hay plantilla registrada")
+
+    # Generar documento y PDF
+    documentos = generar_documento_word_local(
+        plantilla_id=plantilla["id"],
+        valores=valores_para_doc,
+        request=request
+    )
+
+    return {
+        "mensaje": "Cotización generada correctamente",
+        "folio": valores_para_doc["folio"],
+        "cotizaciones": resultado["Cotizaciones"],
+        "documentos": documentos
+    }
 
     # --- Generar documento Word ---
 def generar_documento_word_local(plantilla_id: str, valores: dict, request: Request):
@@ -209,7 +253,7 @@ def generar_documento_word_local(plantilla_id: str, valores: dict, request: Requ
 
     # 3. Si la plantilla no existe localmente, descargarla desde GitHub
     if not os.path.exists(plantilla_path):
-        GITHUB_RAW_URL = "https://raw.githubusercontent.com/FirstLeaseAgent/api-cotizaciones/main/api-cotizaciones/templates/Plantilla_Cotizacion.docx"
+        GITHUB_RAW_URL = "https://github.com/FirstLeaseAgent/template-pdf/raw/refs/heads/main/templates/Plantilla_Cotizacion.docx"
         try:
             response = requests.get(GITHUB_RAW_URL, timeout=30)
             response.raise_for_status()
@@ -299,3 +343,44 @@ def download_pdf(filename: str):
 @app.get("/")
 def root():
     return {"mensaje": "TemplatePDF API funcionando correctamente 🚀"}
+
+# -------------------------------------------------
+# ENDPOINT PARA RECARGAR PLANTILLA DESDE GITHUB
+# -------------------------------------------------
+
+@app.get("/reload_template")
+def reload_template():
+    """
+    Fuerza la descarga de la plantilla desde GitHub y reemplaza la versión local.
+    """
+    import requests
+
+    template_path = os.path.join(TEMPLATES_DIR, TEMPLATE_NAME)
+    try:
+        # Descargar la plantilla actualizada desde GitHub
+        resp = requests.get(GITHUB_RAW_URL, timeout=30)
+        resp.raise_for_status()
+
+        # Guardar la nueva versión localmente
+        with open(template_path, "wb") as f:
+            f.write(resp.content)
+
+        # Actualizar el registro en db.json
+        with open(DB_PATH, "r+") as db_file:
+            data = json.load(db_file)
+            if data["plantillas"]:
+                data["plantillas"][0]["nombre"] = TEMPLATE_NAME
+            else:
+                data["plantillas"].append({
+                    "id": str(uuid.uuid4()),
+                    "nombre": TEMPLATE_NAME,
+                    "variables": []
+                })
+            db_file.seek(0)
+            db_file.truncate()
+            json.dump(data, db_file, indent=4)
+
+        return {"mensaje": "✅ Plantilla actualizada correctamente desde GitHub"}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al actualizar plantilla: {str(e)}")
