@@ -236,9 +236,48 @@ def cotizar(data: CotizacionRequest, request: Request):
         "documentos": documentos
     }
 
+# -------------------------------------------------
+# DEBUG: detectar marcadores en Word
+# -------------------------------------------------
+def debug_list_placeholders(doc_path):
+    """
+    Escanea un archivo .docx y lista todos los placeholders {{...}} detectados,
+    incluso si están divididos en runs.
+    """
+    from docx import Document
+    import re
+
+    print(f"\n🔍 Analizando marcadores en: {doc_path}")
+    doc = Document(doc_path)
+
+    pattern = re.compile(r"\{\{(.*?)\}\}")
+    encontrados = set()
+
+    # Párrafos normales
+    for p in doc.paragraphs:
+        text = "".join(run.text for run in p.runs)
+        matches = pattern.findall(text)
+        for m in matches:
+            encontrados.add(m.strip())
+
+    # Celdas de tabla
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                text = "".join(run.text for p in cell.paragraphs for run in p.runs)
+                matches = pattern.findall(text)
+                for m in matches:
+                    encontrados.add(m.strip())
+
+    print("📄 Marcadores detectados en la plantilla:")
+    for m in sorted(encontrados):
+        print("   •", m)
+
+    print(f"🧾 Total: {len(encontrados)} marcadores encontrados.\n")
+
     # --- Generar documento Word ---
 def generar_documento_word_local(plantilla_id: str, valores: dict, request: Request):
-    import subprocess
+
 
     # 1. Cargar DB
     with open(DB_PATH, "r") as f:
@@ -265,7 +304,7 @@ def generar_documento_word_local(plantilla_id: str, valores: dict, request: Requ
 
     # 4. Cargar Word
     doc = Document(plantilla_path)
-
+    debug_list_placeholders(plantilla_path)
     # 5. Reemplazo de variables manteniendo formato
     for p in doc.paragraphs:
         for run in p.runs:
